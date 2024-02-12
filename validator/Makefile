@@ -24,6 +24,7 @@ include $(CURDIR)/versions.mk
 
 CUDA_IMAGE ?= nvcr.io/nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+DIST ?= ubi8
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
@@ -42,7 +43,7 @@ OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi8 ubuntu20.04
+DISTRIBUTIONS := ubi8 ubuntu20.04 ubuntu22.04
 DEFAULT_PUSH_TARGET := ubi8
 
 PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
@@ -78,7 +79,7 @@ push-short: DIST = $(DEFAULT_PUSH_TARGET)
 build-%: DIST = $(*)
 build-%: DOCKERFILE = $(CURDIR)/Dockerfile
 
-$(DISTRIBUTIONS): %: build-%:
+$(DISTRIBUTIONS): %: build-%
 $(BUILD_TARGETS): build-%:
 	DOCKER_BUILDKIT=1 \
 		$(DOCKER) $(BUILDX) build --pull \
@@ -100,5 +101,6 @@ $(BUILD_TARGETS): build-%:
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 docker-image: $(DEFAULT_PUSH_TARGET)
+ifneq ($(IMAGE_NAME):$(IMAGE_TAG),$(OUT_IMAGE))
 	$(DOCKER) tag $(IMAGE_NAME):$(IMAGE_TAG) $(OUT_IMAGE)
-
+endif

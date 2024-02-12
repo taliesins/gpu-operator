@@ -595,7 +595,10 @@ func getDriverRoot() (string, bool) {
 	// check if driver is pre-installed on the host and use host path for validation
 	if fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
 		log.Infof("Detected pre-installed driver on the host")
-		return "/host", true
+		return "/host/usr/bin", true
+	} else if fileInfo, err := os.Lstat("/host/usr/lib/wsl/lib/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
+		log.Infof("Detected WSL2 Nvidia support on the host, assuming driver pre-installed")
+		return "/host/usr/lib/wsl/lib", true
 	}
 
 	return driverContainerRoot, false
@@ -789,9 +792,19 @@ func (t *Toolkit) validate() error {
 		return err
 	}
 
-	// invoke nvidia-smi command to check if container run with toolkit injected files
-	command := "nvidia-smi"
+	driverRoot, isHostDriver := getDriverRoot()
+
+	if !isHostDriver {
+		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
+		if err := assertDriverContainerReady(false, withWaitFlag); err != nil {
+			return fmt.Errorf("error checking driver container status: %v", err)
+		}
+	}
+
+	// invoke validation command
+	command := driverRoot + "/nvidia-smi"
 	args := []string{}
+
 	if withWaitFlag {
 		err = runCommandWithWait(command, args, sleepIntervalSecondsFlag, false)
 	} else {
@@ -1423,15 +1436,17 @@ func (v *VGPUManager) validate() error {
 }
 
 func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
+	driverRoot, hostDriver := getDriverRoot()
+	if !hostDriver {
+		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
+		if err := assertDriverContainerReady(silent, withWaitFlag); err != nil {
+			return hostDriver, fmt.Errorf("error checking driver container status: %v", err)
+		}
+	}
+
 	// invoke validation command
 	command := "chroot"
-	args := []string{"/run/nvidia/driver", "nvidia-smi"}
-
-	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
-		args = []string{"/host", "nvidia-smi"}
-		hostDriver = true
-	}
+	args := []string{driverRoot, "nvidia-smi"}
 
 	if withWaitFlag {
 		return hostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
