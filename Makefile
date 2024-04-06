@@ -254,7 +254,7 @@ coverage: unit-test
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi8
+DISTRIBUTIONS := ubi8 ubuntu20.04
 DEFAULT_PUSH_TARGET := ubi8
 
 PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
@@ -310,4 +310,7 @@ $(BUILD_TARGETS): build-%:
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 docker-image: ${DEFAULT_PUSH_TARGET}
+ifneq ($(IMAGE_NAME):$(IMAGE_TAG),$(OUT_IMAGE))
+	$(DOCKER) tag $(IMAGE_NAME):$(IMAGE_TAG) $(OUT_IMAGE)
+endif
 endif
